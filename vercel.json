@@ -1,0 +1,16 @@
+{
+  "name": "contract-extractor",
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "env": {
+    "OPENAI_API_KEY": "@openai-api-key",
+    "PAYSTACK_PUBLIC_KEY": "@paystack-public-key",
+    "PAYSTACK_SECRET_KEY": "@paystack-secret-key",
+    "NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY": "@next-public-paystack-public-key"
+  }
+}
