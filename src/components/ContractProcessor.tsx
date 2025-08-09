@@ -87,8 +87,8 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
     const formData = new FormData(event.currentTarget);
     const file = formData.get('document') as File;
 
-    // Check both form data and selected file state
-    if (!file || !selectedFile) {
+    // Check if file was properly uploaded
+    if (!file || file.size === 0) {
       setError('Please select a document file before submitting');
       setIsLoading(false);
       return;
@@ -425,7 +425,7 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
             
             <button
               type="submit"
-              disabled={isLoading || !selectedFile}
+              disabled={isLoading}
               className="w-full btn-primary py-3 sm:py-4 text-base sm:text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {isLoading 
@@ -442,7 +442,7 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
                     <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    {selectedFile ? 'Extract Obligations' : 'Please Select a File First'}
+                    Extract Obligations
                   </div>
                 )}
             </button>
