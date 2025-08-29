@@ -477,7 +477,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 </svg>
               </div>
               <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Email Support</h3>
-              <p className="text-sm sm:text-base text-gray-600 break-all">support@contractobligation.com</p>
+              <p className="text-sm sm:text-base text-gray-600 break-all">tlaliketumile2@gmail.com</p>
             </div>
             
             <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200">
