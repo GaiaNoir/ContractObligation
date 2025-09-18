@@ -84,10 +84,10 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
     setShowPreview(false);
     setProgress(0);
 
-    const formData = new FormData(event.currentTarget);
-    const file = formData.get('document') as File;
+    // Use selectedFile state instead of form data to ensure we have the file
+    const file = selectedFile;
 
-    // Check if file was properly uploaded
+    // Check if file was properly selected
     if (!file || file.size === 0) {
       setError('Please select a document file before submitting');
       setIsLoading(false);
@@ -112,6 +112,10 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
       
       updateProgress('Extracting text from document...', 30);
       setIsAiProcessing(true);
+      
+      // Create FormData with the selected file
+      const formData = new FormData();
+      formData.append('document', file);
       
       const response = await fetch('/api/extract-pdf', {
         method: 'POST',
@@ -366,14 +370,13 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
                             {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
                           </div>
                         </div>
-                        <label htmlFor="document" className="inline-block mt-3 cursor-pointer text-blue-600 font-medium hover:text-blue-700 underline text-sm sm:text-base">
+                        <label htmlFor="document-change" className="inline-block mt-3 cursor-pointer text-blue-600 font-medium hover:text-blue-700 underline text-sm sm:text-base">
                           Choose a different file
                           <input
-                            id="document"
+                            id="document-change"
                             name="document"
                             type="file"
                             accept=".pdf,.docx,.doc"
-                            required
                             className="sr-only"
                             onChange={handleFileChange}
                           />
@@ -389,14 +392,13 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
                         </svg>
                       </div>
                       <div className="flex flex-col sm:flex-row items-center justify-center text-base sm:text-lg text-gray-700">
-                        <label htmlFor="document" className="relative cursor-pointer text-blue-600 font-semibold hover:text-blue-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500 rounded-lg px-2 py-1">
+                        <label htmlFor="document-upload" className="relative cursor-pointer text-blue-600 font-semibold hover:text-blue-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500 rounded-lg px-2 py-1">
                           <span>Upload a document</span>
                           <input
-                            id="document"
+                            id="document-upload"
                             name="document"
                             type="file"
                             accept=".pdf,.docx,.doc"
-                            required
                             className="sr-only"
                             onChange={handleFileChange}
                           />
@@ -425,7 +427,7 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
             
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !selectedFile}
               className="w-full btn-primary py-3 sm:py-4 text-base sm:text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {isLoading 
@@ -442,7 +444,7 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
                     <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    Extract Obligations
+                    {selectedFile ? 'Extract Obligations' : 'Please Upload Document First'}
                   </div>
                 )}
             </button>
