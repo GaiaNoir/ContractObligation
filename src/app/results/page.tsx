@@ -4,11 +4,11 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import jsPDF from 'jspdf';
 import { Obligation, PaymentData } from '@/types';
+import ObligationCard from '@/components/ObligationCard';
 
 function ResultsContent() {
   const searchParams = useSearchParams();
   const reference = searchParams.get('reference');
-  
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -99,14 +99,21 @@ function ResultsContent() {
         }
 
         pdf.setFontSize(12);
-        pdf.setFont(undefined, 'bold');
-        pdf.text(`${index + 1}. Responsible Party: ${obligation.responsible_party}`, margin, yPosition);
+        pdf.setFont('helvetica', 'bold');
+        
+        // Add contract source if available
+        if (obligation.contractSource) {
+          pdf.text(`${index + 1}. Contract: ${obligation.contractSource.filename}`, margin, yPosition);
+          yPosition += 8;
+        }
+        
+        pdf.text(`${obligation.contractSource ? '   ' : `${index + 1}. `}Responsible Party: ${obligation.responsible_party}`, margin, yPosition);
         yPosition += 8;
         
-        pdf.text(`Deadline: ${obligation.deadline}`, margin, yPosition);
+        pdf.text(`${obligation.contractSource ? '   ' : ''}Deadline: ${obligation.deadline}`, margin, yPosition);
         yPosition += 8;
 
-        pdf.setFont(undefined, 'normal');
+        pdf.setFont('helvetica', 'normal');
         const lines = pdf.splitTextToSize(obligation.obligation, maxWidth);
         pdf.text(lines, margin, yPosition);
         yPosition += lines.length * 6 + 10;
@@ -131,9 +138,16 @@ function ResultsContent() {
     content += `Extracted Obligations:\n\n`;
 
     paymentData.obligations.forEach((obligation, index) => {
-      content += `${index + 1}. Responsible Party: ${obligation.responsible_party}\n`;
-      content += `   Deadline: ${obligation.deadline}\n`;
-      content += `   Obligation: ${obligation.obligation}\n\n`;
+      if (obligation.contractSource) {
+        content += `${index + 1}. Contract: ${obligation.contractSource.filename}\n`;
+        content += `   Responsible Party: ${obligation.responsible_party}\n`;
+        content += `   Deadline: ${obligation.deadline}\n`;
+        content += `   Obligation: ${obligation.obligation}\n\n`;
+      } else {
+        content += `${index + 1}. Responsible Party: ${obligation.responsible_party}\n`;
+        content += `   Deadline: ${obligation.deadline}\n`;
+        content += `   Obligation: ${obligation.obligation}\n\n`;
+      }
     });
 
     const blob = new Blob([content], { type: 'text/plain' });
@@ -216,7 +230,16 @@ function ResultsContent() {
                   Contract Obligations ({paymentData.obligations.length})
                 </h2>
                 <p className="text-sm text-gray-500">
-                  File: {paymentData.filename} • {paymentData.pageInfo}
+                  {/* Check if this is batch processing by looking for contractSource in obligations */}
+                  {paymentData.obligations.some(o => o.contractSource) ? (
+                    <>
+                      Batch Processing Results • {paymentData.obligations.length} obligations from {
+                        new Set(paymentData.obligations.map(o => o.contractSource?.filename).filter(Boolean)).size
+                      } contracts
+                    </>
+                  ) : (
+                    <>File: {paymentData.filename} • {paymentData.pageInfo}</>
+                  )}
                 </p>
               </div>
             </div>
@@ -245,41 +268,7 @@ function ResultsContent() {
           
           <div className="grid gap-4">
             {paymentData.obligations.map((obligation, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-6 hover:shadow-sm transition-all duration-200">
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium border-l-4 ${
-                    obligation.responsible_party.toLowerCase() === 'party a' ? 'bg-blue-50 text-blue-800 border-blue-500' :
-                    obligation.responsible_party.toLowerCase() === 'party b' ? 'bg-green-50 text-green-800 border-green-500' :
-                    obligation.responsible_party.toLowerCase().includes('both') ? 'bg-purple-50 text-purple-800 border-purple-500' :
-                    'bg-gray-50 text-gray-800 border-gray-500'
-                  }`}>
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center mr-2 ${
-                      obligation.responsible_party.toLowerCase() === 'party a' ? 'bg-blue-600' :
-                      obligation.responsible_party.toLowerCase() === 'party b' ? 'bg-green-600' :
-                      obligation.responsible_party.toLowerCase().includes('both') ? 'bg-purple-600' :
-                      'bg-gray-600'
-                    }`}>
-                      <span className="text-white text-xs font-bold">
-                        {obligation.responsible_party.toLowerCase() === 'party a' ? 'A' :
-                         obligation.responsible_party.toLowerCase() === 'party b' ? 'B' :
-                         obligation.responsible_party.toLowerCase().includes('both') ? '⚭' : '?'}
-                      </span>
-                    </div>
-                    <span>{obligation.responsible_party}</span>
-                  </div>
-                  <div className="flex items-center bg-gray-100 px-3 py-2 rounded-lg text-sm text-gray-700">
-                    <svg className="w-4 h-4 text-orange-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>{obligation.deadline}</span>
-                  </div>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <p className="text-gray-800 leading-relaxed">
-                    {obligation.obligation}
-                  </p>
-                </div>
-              </div>
+              <ObligationCard key={index} obligation={obligation} isPreview={false} />
             ))}
           </div>
         </div>

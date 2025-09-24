@@ -3,6 +3,22 @@ export interface Obligation {
   responsible_party: string;
   deadline: string;
   confidence?: number;
+  contractSource?: {
+    filename: string;       // Name of the contract file this obligation came from
+    pageInfo?: string;      // Page information (e.g., "5 pages", "3 pages (2 processed)")
+  };
+  source?: {
+    text: string;           // The exact sentence/paragraph from the original contract
+    startIndex?: number;    // Character index where the source text starts
+    endIndex?: number;      // Character index where the source text ends
+    pageNumber?: number;    // Page number where this text appears (for PDFs)
+    lineNumber?: number;    // Line number where this text appears (if available)
+    matchScore?: number;    // Confidence score for fuzzy matching (1.0 = exact match)
+  };
+  risk?: {
+    level: 'High' | 'Medium' | 'Low';  // Risk assessment level
+    explanation: string;               // Explanation of why it was flagged at this level
+  };
 }
 
 export interface ExtractedData {

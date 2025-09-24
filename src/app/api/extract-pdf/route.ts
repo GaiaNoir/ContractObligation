@@ -9,23 +9,107 @@ interface Obligation {
   obligation: string;
   responsible_party: string;
   deadline: string;
+  contractSource?: {
+    filename: string;
+    pageInfo?: string;
+  };
+  source?: {
+    text: string;
+    startIndex?: number;
+    endIndex?: number;
+    pageNumber?: number;
+    lineNumber?: number;
+    matchScore?: number;
+  };
+  risk?: {
+    level: 'High' | 'Medium' | 'Low';
+    explanation: string;
+  };
 }
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-async function extractTextFromWord(buffer: Buffer): Promise<string> {
+async function extractTextFromWord(buffer: Buffer): Promise<{ text: string; pageBreaks: number[] }> {
   try {
     const result = await mammoth.extractRawText({ buffer });
-    return result.value;
+    const text = result.value;
+    
+    // Estimate page breaks for DOCX files based on content length and structure
+    const pageBreaks: number[] = [0]; // Start of document
+    const lines = text.split('\n');
+    let currentPosition = 0;
+    let currentPageLength = 0;
+    const avgCharsPerPage = 3000; // Rough estimate for page length
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineLength = line.length + 1; // +1 for newline
+      
+      // Check for explicit page break indicators or length-based breaks
+      if (line.includes('\f') || line.includes('PAGE BREAK') || 
+          currentPageLength > avgCharsPerPage) {
+        pageBreaks.push(currentPosition);
+        currentPageLength = 0;
+      }
+      
+      currentPosition += lineLength;
+      currentPageLength += lineLength;
+    }
+    
+    return { text, pageBreaks };
   } catch (error) {
     console.error('Word extraction error:', error);
     throw new Error('Failed to extract text from Word document');
   }
 }
 
-async function extractObligations(text: string): Promise<Obligation[]> {
+// Fuzzy text matching function
+function findBestMatch(needle: string, haystack: string, threshold: number = 0.6): { index: number; score: number } | null {
+  if (!needle || !haystack) return null;
+  
+  const needleWords = needle.toLowerCase().trim().split(/\s+/);
+  const haystackWords = haystack.toLowerCase().split(/\s+/);
+  
+  let bestMatch = { index: -1, score: 0 };
+  
+  // Try to find the best matching sequence
+  for (let i = 0; i <= haystackWords.length - needleWords.length; i++) {
+    const segment = haystackWords.slice(i, i + needleWords.length);
+    let matches = 0;
+    
+    for (let j = 0; j < needleWords.length; j++) {
+      if (segment[j] && needleWords[j] === segment[j]) {
+        matches++;
+      } else if (segment[j] && segment[j].includes(needleWords[j])) {
+        matches += 0.5; // Partial match
+      } else if (segment[j] && needleWords[j].includes(segment[j])) {
+        matches += 0.5; // Partial match
+      }
+    }
+    
+    const score = matches / needleWords.length;
+    if (score > bestMatch.score && score >= threshold) {
+      // Calculate character position
+      const wordPosition = haystackWords.slice(0, i).join(' ').length;
+      bestMatch = { index: wordPosition + (i > 0 ? 1 : 0), score };
+    }
+  }
+  
+  return bestMatch.index >= 0 ? bestMatch : null;
+}
+
+function getPageFromPosition(position: number, pageBreaks: number[]): number {
+  for (let i = pageBreaks.length - 1; i >= 0; i--) {
+    if (position >= pageBreaks[i]) {
+      return i + 1;
+    }
+  }
+  return 1;
+}
+
+async function analyzeObligationRisk(obligation: string, responsibleParty: string, deadline: string): Promise<{ level: 'High' | 'Medium' | 'Low'; explanation: string }> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OpenAI API key not configured');
   }
@@ -36,11 +120,81 @@ async function extractObligations(text: string): Promise<Obligation[]> {
       messages: [
         {
           role: "system",
-          content: "You are a legal document analyzer. Extract obligations from contracts and return them as a JSON array."
+          content: "You are a legal risk analyst. Analyze contract obligations and assess their risk level. Focus only on the obligation itself - do not add new obligations or hallucinate clauses."
         },
         {
           role: "user",
-          content: `Extract all obligations from this contract. For each obligation, identify: what needs to be done, who is responsible (Party A or Party B), and any deadlines. Return as a JSON array with fields: obligation, responsible_party, deadline. If no deadline is specified, use "Not specified".
+          content: `Analyze this contract obligation and rate its risk level as High, Medium, or Low. Provide a brief explanation.
+
+Obligation: "${obligation}"
+Responsible Party: "${responsibleParty}"
+Deadline: "${deadline}"
+
+Consider these risk factors:
+- High Risk: Potentially problematic, unfair, or heavily one-sided obligations (e.g., auto-renewal without notice, unlimited liability, termination without cause)
+- Medium Risk: Obligations that may need attention or could cause issues (e.g., vague deadlines, broad scope, potential conflicts)
+- Low Risk: Standard, reasonable obligations with clear terms
+
+Return your response as JSON with fields: level (High/Medium/Low), explanation (brief reason for the risk rating).`
+        }
+      ],
+      temperature: 0.1,
+    });
+
+    const response = completion.choices[0]?.message?.content;
+    if (!response) {
+      throw new Error('No response from OpenAI for risk analysis');
+    }
+
+    const riskAnalysis = JSON.parse(response);
+    
+    // Validate the response structure
+    if (!riskAnalysis.level || !riskAnalysis.explanation) {
+      throw new Error('Invalid risk analysis response structure');
+    }
+
+    // Ensure level is one of the expected values
+    const validLevels = ['High', 'Medium', 'Low'];
+    if (!validLevels.includes(riskAnalysis.level)) {
+      throw new Error(`Invalid risk level: ${riskAnalysis.level}`);
+    }
+
+    return {
+      level: riskAnalysis.level as 'High' | 'Medium' | 'Low',
+      explanation: riskAnalysis.explanation
+    };
+  } catch (error) {
+    console.error('Risk analysis error:', error);
+    // Return a default low risk assessment if analysis fails
+    return {
+      level: 'Low',
+      explanation: 'Risk analysis unavailable - defaulted to low risk'
+    };
+  }
+}
+
+async function extractObligations(text: string, pageBreaks?: number[]): Promise<Obligation[]> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OpenAI API key not configured');
+  }
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: "You are a legal document analyzer. Extract obligations from contracts and return them as a JSON array with source traceability."
+        },
+        {
+          role: "user",
+          content: `Extract all obligations from this contract. For each obligation, identify:
+1. What needs to be done (obligation)
+2. Who is responsible (responsible_party: Party A or Party B)
+3. Any deadlines (deadline: use "Not specified" if none)
+4. The exact sentence or paragraph from the original text where this obligation appears (source_text)
+
+Return as a JSON array with fields: obligation, responsible_party, deadline, source_text.
 
 Contract text:
 ${text}`
@@ -55,8 +209,89 @@ ${text}`
     }
 
     // Try to parse the JSON response
-    const obligations = JSON.parse(response);
-    return Array.isArray(obligations) ? obligations : [];
+    const rawObligations = JSON.parse(response);
+    if (!Array.isArray(rawObligations)) {
+      return [];
+    }
+
+    // Add source traceability information and perform risk analysis
+    const obligations: Obligation[] = await Promise.all(rawObligations.map(async (obligation: any) => {
+      const result: Obligation = {
+        obligation: obligation.obligation || '',
+        responsible_party: obligation.responsible_party || '',
+        deadline: obligation.deadline || 'Not specified'
+      };
+
+      // Add source information if available
+      if (obligation.source_text) {
+        const sourceText = obligation.source_text.trim();
+        let startIndex = text.indexOf(sourceText);
+        let matchScore = 1.0;
+        
+        // If exact match not found, try fuzzy matching
+        if (startIndex === -1) {
+          const fuzzyMatch = findBestMatch(sourceText, text, 0.6);
+          if (fuzzyMatch) {
+            startIndex = fuzzyMatch.index;
+            matchScore = fuzzyMatch.score;
+          }
+        }
+        
+        if (startIndex !== -1) {
+          result.source = {
+            text: sourceText,
+            startIndex: startIndex,
+            endIndex: startIndex + sourceText.length,
+            matchScore: matchScore
+          };
+
+          // Determine page number based on document type
+          if (pageBreaks && pageBreaks.length > 1) {
+            // For DOCX/TXT files with estimated page breaks
+            result.source.pageNumber = getPageFromPosition(startIndex, pageBreaks);
+          } else {
+            // For PDF files with explicit page markers
+            const textBeforeSource = text.substring(0, startIndex);
+            const pageMatches = textBeforeSource.match(/--- Page (\d+) ---/g);
+            if (pageMatches && pageMatches.length > 0) {
+              const lastPageMatch = pageMatches[pageMatches.length - 1];
+              const pageNumber = parseInt(lastPageMatch.match(/\d+/)?.[0] || '1');
+              result.source.pageNumber = pageNumber;
+            }
+          }
+
+          // Calculate approximate line number
+          const textBeforeSource = text.substring(0, startIndex);
+          const linesBeforeSource = textBeforeSource.split('\n').length;
+          result.source.lineNumber = linesBeforeSource;
+        } else {
+          // If no match found at all, still include the source text from AI
+          result.source = {
+            text: sourceText
+          };
+        }
+      }
+
+      // Perform risk analysis for each obligation
+      try {
+        const riskAnalysis = await analyzeObligationRisk(
+          result.obligation,
+          result.responsible_party,
+          result.deadline
+        );
+        result.risk = riskAnalysis;
+      } catch (error) {
+        console.error('Risk analysis failed for obligation:', result.obligation, error);
+        // Set default risk if analysis fails
+        result.risk = {
+          level: 'Low',
+          explanation: 'Risk analysis failed - defaulted to low risk'
+        };
+      }
+      return result;
+    }));
+
+    return obligations;
   } catch (error) {
     console.error('OpenAI API error:', error);
     throw new Error('Failed to extract obligations using AI');
@@ -81,12 +316,13 @@ export async function POST(request: NextRequest) {
     const allowedTypes = [
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-      'application/msword' // .doc
+      'application/msword', // .doc
+      'text/plain' // .txt
     ];
     
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Please upload a PDF or Word document (.pdf, .docx, .doc)' },
+        { error: 'Please upload a PDF, Word document, or text file (.pdf, .docx, .doc, .txt)' },
         { status: 400 }
       );
     }
@@ -99,6 +335,7 @@ export async function POST(request: NextRequest) {
 
     let extractedText = '';
     let pageCount = 1;
+    let pageBreaks: number[] | undefined;
 
     try {
       if (file.type === 'application/pdf') {
@@ -170,11 +407,40 @@ export async function POST(request: NextRequest) {
           }
           tempFilePath = null;
         }
-      } else {
+      } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+                 file.type === 'application/msword') {
         // Handle Word documents (.doc, .docx)
-        extractedText = await extractTextFromWord(buffer);
-        // Word documents don't have pages in the same way, so we'll estimate
-        pageCount = Math.max(1, Math.ceil(extractedText.length / 3000)); // Rough estimate
+        const wordResult = await extractTextFromWord(buffer);
+        extractedText = wordResult.text;
+        pageBreaks = wordResult.pageBreaks;
+        pageCount = Math.max(1, pageBreaks.length - 1); // Number of page breaks indicates pages
+      } else if (file.type === 'text/plain') {
+        // Handle TXT files
+        extractedText = buffer.toString('utf-8');
+        
+        // Create page breaks for TXT files based on content structure
+        pageBreaks = [0]; // Start of document
+        const lines = extractedText.split('\n');
+        let currentPosition = 0;
+        let currentPageLength = 0;
+        const avgCharsPerPage = 3000; // Rough estimate for page length
+        
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const lineLength = line.length + 1; // +1 for newline
+          
+          // Check for explicit page break indicators or length-based breaks
+          if (line.includes('\f') || line.includes('PAGE BREAK') || 
+              line.includes('---PAGE---') || currentPageLength > avgCharsPerPage) {
+            pageBreaks.push(currentPosition);
+            currentPageLength = 0;
+          }
+          
+          currentPosition += lineLength;
+          currentPageLength += lineLength;
+        }
+        
+        pageCount = Math.max(1, pageBreaks.length - 1);
       }
 
       // Extract obligations using OpenAI
@@ -183,7 +449,7 @@ export async function POST(request: NextRequest) {
 
       if (extractedText && extractedText.trim()) {
         try {
-          obligations = await extractObligations(extractedText);
+          obligations = await extractObligations(extractedText, pageBreaks);
         } catch (error) {
           console.error('AI extraction error:', error);
           aiError = error instanceof Error ? error.message : 'AI extraction failed';

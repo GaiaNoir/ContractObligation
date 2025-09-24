@@ -7,11 +7,29 @@ import ErrorMessage from './ErrorMessage';
 import ObligationCard from './ObligationCard';
 import ResultsSummary from './ResultsSummary';
 
-interface ContractProcessorProps {
-  onBackToHome: () => void;
+interface FileProcessingStatus {
+  file: File;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  obligations?: Obligation[];
+  extractedText?: string;
+  filename?: string;
+  pageInfo?: string;
+  error?: string;
+  aiError?: string;
 }
 
-export default function ContractProcessor({ onBackToHome }: ContractProcessorProps) {
+interface BatchResults {
+  totalFiles: number;
+  processedFiles: number;
+  totalObligations: number;
+  fileResults: FileProcessingStatus[];
+}
+
+interface ContractProcessorProps {
+  onBackToHomeAction: () => void;
+}
+
+export default function ContractProcessor({ onBackToHomeAction }: ContractProcessorProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [error, setError] = useState('');
@@ -27,6 +45,11 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
   const [processingStage, setProcessingStage] = useState('');
   const [progress, setProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [batchResults, setBatchResults] = useState<BatchResults | null>(null);
+  const [currentProcessingFile, setCurrentProcessingFile] = useState<string>('');
+  const [fileProcessingStatuses, setFileProcessingStatuses] = useState<FileProcessingStatus[]>([]);
 
   const trackEvent = (eventName: string, parameters?: any) => {
     if (typeof window !== 'undefined' && window.gtag) {
@@ -40,11 +63,12 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
     const allowedTypes = [
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-      'application/msword' // .doc
+      'application/msword', // .doc
+      'text/plain' // .txt
     ];
     
     if (!allowedTypes.includes(file.type)) {
-      return 'Please select a PDF or Word document (.pdf, .docx, .doc).';
+      return 'Please select a PDF, Word document, or text file (.pdf, .docx, .doc, .txt).';
     }
     
     const maxSize = 10 * 1024 * 1024; // 10MB in bytes
@@ -53,7 +77,7 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
     }
     
     if (file.size === 0) {
-      return 'The selected file appears to be empty. Please select a valid PDF file.';
+      return 'The selected file appears to be empty. Please select a valid document file.';
     }
     
     return null;
@@ -65,15 +89,211 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null;
-    setSelectedFile(file);
-    if (file) {
-      setError(''); // Clear any previous errors when a new file is selected
+    const files = event.target.files;
+    if (!files || files.length === 0) {
+      setSelectedFile(null);
+      setSelectedFiles([]);
+      setIsBatchMode(false);
+      return;
+    }
+
+    if (files.length === 1) {
+      // Single file mode
+      setSelectedFile(files[0]);
+      setSelectedFiles([]);
+      setIsBatchMode(false);
+    } else {
+      // Batch mode
+      const fileArray = Array.from(files);
+      setSelectedFiles(fileArray);
+      setSelectedFile(null);
+      setIsBatchMode(true);
+      
+      // Initialize processing statuses
+      const statuses: FileProcessingStatus[] = fileArray.map(file => ({
+        file,
+        status: 'pending'
+      }));
+      setFileProcessingStatuses(statuses);
+    }
+    
+    setError(''); // Clear any previous errors when new files are selected
+  };
+
+  const processSingleFile = async (file: File): Promise<FileProcessingStatus> => {
+    const validationError = validateFile(file);
+    if (validationError) {
+      return {
+        file,
+        status: 'error',
+        error: validationError
+      };
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('document', file);
+      
+      const response = await fetch('/api/extract-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        let info = `${data.pages} page${data.pages !== 1 ? 's' : ''}`;
+        if (data.processedPages && data.processedPages < data.pages) {
+          info += ` (${data.processedPages} processed)`;
+        }
+
+        return {
+          file,
+          status: 'completed',
+          obligations: data.obligations || [],
+          extractedText: data.text,
+          filename: data.filename,
+          pageInfo: info,
+          aiError: data.aiError
+        };
+      } else {
+        let errorMsg = data.error || 'Failed to extract text';
+        if (data.details) {
+          errorMsg += `\n\nDetails: ${data.details}`;
+        }
+        if (data.suggestion) {
+          errorMsg += `\n\nSuggestion: ${data.suggestion}`;
+        }
+        return {
+          file,
+          status: 'error',
+          error: errorMsg
+        };
+      }
+    } catch (err) {
+      return {
+        file,
+        status: 'error',
+        error: 'An error occurred while processing the file. Please try again.'
+      };
+    }
+  };
+
+  const handleBatchUpload = async () => {
+    if (selectedFiles.length === 0) {
+      setError('Please select files before submitting');
+      return;
+    }
+
+    setIsLoading(true);
+    setIsAiProcessing(false);
+    setError('');
+    setAiError('');
+    setShowPreview(false);
+    setProgress(0);
+
+    trackEvent('batch_upload_started', {
+      file_count: selectedFiles.length,
+      total_size: selectedFiles.reduce((sum, file) => sum + file.size, 0)
+    });
+
+    const results: FileProcessingStatus[] = [];
+    let totalObligations = 0;
+
+    try {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        setCurrentProcessingFile(file.name);
+        
+        // Update progress
+        const progressPercent = Math.round((i / selectedFiles.length) * 100);
+        updateProgress(`Processing ${file.name}... (${i + 1}/${selectedFiles.length})`, progressPercent);
+        
+        // Update file status to processing
+        setFileProcessingStatuses(prev => 
+          prev.map(status => 
+            status.file.name === file.name 
+              ? { ...status, status: 'processing' }
+              : status
+          )
+        );
+
+        setIsAiProcessing(true);
+        const result = await processSingleFile(file);
+        results.push(result);
+        
+        if (result.status === 'completed' && result.obligations) {
+          totalObligations += result.obligations.length;
+        }
+
+        // Update file status
+        setFileProcessingStatuses(prev => 
+          prev.map(status => 
+            status.file.name === file.name 
+              ? result
+              : status
+          )
+        );
+
+        // Small delay between files
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      const batchResults: BatchResults = {
+        totalFiles: selectedFiles.length,
+        processedFiles: results.filter(r => r.status === 'completed').length,
+        totalObligations,
+        fileResults: results
+      };
+
+      setBatchResults(batchResults);
+      
+      // For display purposes, aggregate all obligations with contract source information
+      const allObligations = results
+        .filter(r => r.status === 'completed' && r.obligations)
+        .flatMap(r => r.obligations!.map(obligation => ({
+          ...obligation,
+          contractSource: {
+            filename: r.filename || r.file.name,
+            pageInfo: r.pageInfo
+          }
+        })));
+      
+      setObligations(allObligations);
+      setShowPreview(true);
+      updateProgress('Batch processing complete!', 100);
+
+      trackEvent('batch_extraction_completed', {
+        total_files: selectedFiles.length,
+        successful_files: batchResults.processedFiles,
+        total_obligations: totalObligations
+      });
+
+    } catch (err) {
+      const errorMessage = 'An error occurred during batch processing. Please try again.';
+      setError(errorMessage);
+      
+      trackEvent('batch_extraction_error', {
+        error: err instanceof Error ? err.message : 'Unknown error'
+      });
+    } finally {
+      setIsLoading(false);
+      setIsAiProcessing(false);
+      setProcessingStage('');
+      setProgress(0);
+      setCurrentProcessingFile('');
     }
   };
 
   const handleFileUpload = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    
+    if (isBatchMode) {
+      await handleBatchUpload();
+      return;
+    }
+
+    // Original single file logic
     setIsLoading(true);
     setIsAiProcessing(false);
     setError('');
@@ -309,7 +529,7 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
         {/* Header */}
         <div className="flex items-center justify-between mb-8 sm:mb-12">
           <button
-            onClick={onBackToHome}
+            onClick={onBackToHomeAction}
             className="flex items-center text-blue-600 hover:text-blue-800 bg-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg border border-gray-200 hover:border-blue-300 btn-hover text-sm sm:text-base"
           >
             <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -341,10 +561,10 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
           <form onSubmit={handleFileUpload} className="space-y-6 sm:space-y-8">
             <div>
               <label htmlFor="document" className="block text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
-                Select Contract Document (Max 10MB)
+                Select Contract Document(s) (PDF, DOCX, DOC, TXT - Max 10MB each)
               </label>
               <div className={`mt-2 flex justify-center px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-6 sm:pb-8 border-2 border-dashed rounded-xl transition-all duration-200 ${
-                selectedFile 
+                selectedFile || selectedFiles.length > 0
                   ? 'border-green-300 bg-green-50 hover:border-green-400' 
                   : 'border-blue-300 hover:border-blue-400 hover:bg-blue-50'
               }`}>
@@ -376,7 +596,49 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
                             id="document-change"
                             name="document"
                             type="file"
-                            accept=".pdf,.docx,.doc"
+                            accept=".pdf,.docx,.doc,.txt"
+                            className="sr-only"
+                            onChange={handleFileChange}
+                          />
+                        </label>
+                      </div>
+                    </>
+                  ) : selectedFiles.length > 0 ? (
+                    // Multiple files selected state
+                    <>
+                      <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-green-600 rounded-xl flex items-center justify-center">
+                        <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-5L9 2H4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="text-base sm:text-lg text-gray-700">
+                        <div className="font-semibold text-green-700 mb-2">{selectedFiles.length} Files Selected</div>
+                        <div className="bg-white rounded-lg p-3 border border-green-200 max-h-40 overflow-y-auto">
+                          {selectedFiles.map((file, index) => (
+                            <div key={index} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-b-0">
+                              <div className="flex items-center space-x-2">
+                                <svg className="w-4 h-4 text-gray-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                                </svg>
+                                <span className="font-medium text-gray-800 text-sm truncate max-w-48">{file.name}</span>
+                              </div>
+                              <span className="text-xs text-gray-500 ml-2">
+                                {(file.size / (1024 * 1024)).toFixed(2)} MB
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-xs sm:text-sm text-gray-500 mt-2">
+                          Total: {(selectedFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024)).toFixed(2)} MB
+                        </div>
+                        <label htmlFor="document-change" className="inline-block mt-3 cursor-pointer text-blue-600 font-medium hover:text-blue-700 underline text-sm sm:text-base">
+                          Choose different files
+                          <input
+                            id="document-change"
+                            name="document"
+                            type="file"
+                            accept=".pdf,.docx,.doc,.txt"
+                            multiple
                             className="sr-only"
                             onChange={handleFileChange}
                           />
@@ -393,12 +655,13 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
                       </div>
                       <div className="flex flex-col sm:flex-row items-center justify-center text-base sm:text-lg text-gray-700">
                         <label htmlFor="document-upload" className="relative cursor-pointer text-blue-600 font-semibold hover:text-blue-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500 rounded-lg px-2 py-1">
-                          <span>Upload a document</span>
+                          <span>Upload document(s)</span>
                           <input
                             id="document-upload"
                             name="document"
                             type="file"
-                            accept=".pdf,.docx,.doc"
+                            accept=".pdf,.docx,.doc,.txt"
+                            multiple
                             className="sr-only"
                             onChange={handleFileChange}
                           />
@@ -410,7 +673,7 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
                           <svg className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>
-                          <span>PDF, DOCX, DOC up to 10MB</span>
+                          <span>PDF, DOCX, DOC, TXT up to 10MB</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <svg className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
@@ -427,7 +690,7 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
             
             <button
               type="submit"
-              disabled={isLoading || !selectedFile}
+              disabled={isLoading || (!selectedFile && selectedFiles.length === 0)}
               className="w-full btn-primary py-3 sm:py-4 text-base sm:text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {isLoading 
@@ -444,7 +707,12 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
                     <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    {selectedFile ? 'Extract Obligations' : 'Please Upload Document First'}
+                    {selectedFile || selectedFiles.length > 0 
+                      ? isBatchMode 
+                        ? `Extract Obligations from ${selectedFiles.length} Files`
+                        : 'Extract Obligations'
+                      : 'Please Upload Document(s) First'
+                    }
                   </div>
                 )}
             </button>
@@ -456,6 +724,60 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
                   className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
                   style={{ width: `${progress}%` }}
                 ></div>
+              </div>
+            )}
+
+            {/* Batch Processing Status */}
+            {isBatchMode && isLoading && fileProcessingStatuses.length > 0 && (
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-800 mb-3">Processing Files:</h3>
+                <div className="space-y-2">
+                  {fileProcessingStatuses.map((status, index) => (
+                    <div key={index} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg border border-gray-100">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                          status.status === 'completed' ? 'bg-green-500' :
+                          status.status === 'processing' ? 'bg-blue-500' :
+                          status.status === 'error' ? 'bg-red-500' :
+                          'bg-gray-300'
+                        }`}>
+                          {status.status === 'completed' && (
+                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                          {status.status === 'processing' && (
+                            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                          )}
+                          {status.status === 'error' && (
+                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="text-sm font-medium text-gray-800 truncate max-w-48">
+                          {status.file.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {status.status === 'completed' && status.obligations && (
+                          <span className="text-xs text-green-600 font-medium">
+                            {status.obligations.length} obligations
+                          </span>
+                        )}
+                        {status.status === 'error' && (
+                          <span className="text-xs text-red-600 font-medium">Failed</span>
+                        )}
+                        {status.status === 'processing' && (
+                          <span className="text-xs text-blue-600 font-medium">Processing...</span>
+                        )}
+                        {status.status === 'pending' && (
+                          <span className="text-xs text-gray-500 font-medium">Pending</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </form>
@@ -487,20 +809,41 @@ export default function ContractProcessor({ onBackToHome }: ContractProcessorPro
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Contract Obligations Preview</h2>
-                  <p className="text-gray-600">AI analysis complete</p>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    {isBatchMode ? 'Batch Processing Results' : 'Contract Obligations Preview'}
+                  </h2>
+                  <p className="text-gray-600">
+                    {isBatchMode ? 'AI analysis complete for all files' : 'AI analysis complete'}
+                  </p>
                 </div>
               </div>
               <div className="text-right">
-                {filename && (
-                  <div className="bg-blue-50 px-4 py-2 rounded-lg border border-blue-200 mb-2">
-                    <span className="text-sm font-medium text-blue-800">📄 {filename}</span>
-                  </div>
-                )}
-                {pageInfo && (
-                  <div className="bg-green-50 px-4 py-2 rounded-lg border border-green-200">
-                    <span className="text-sm font-medium text-green-800">📊 {pageInfo}</span>
-                  </div>
+                {isBatchMode && batchResults ? (
+                  <>
+                    <div className="bg-blue-50 px-4 py-2 rounded-lg border border-blue-200 mb-2">
+                      <span className="text-sm font-medium text-blue-800">
+                        📁 {batchResults.processedFiles}/{batchResults.totalFiles} files processed
+                      </span>
+                    </div>
+                    <div className="bg-green-50 px-4 py-2 rounded-lg border border-green-200">
+                      <span className="text-sm font-medium text-green-800">
+                        📊 {batchResults.totalObligations} total obligations
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {filename && (
+                      <div className="bg-blue-50 px-4 py-2 rounded-lg border border-blue-200 mb-2">
+                        <span className="text-sm font-medium text-blue-800">📄 {filename}</span>
+                      </div>
+                    )}
+                    {pageInfo && (
+                      <div className="bg-green-50 px-4 py-2 rounded-lg border border-green-200">
+                        <span className="text-sm font-medium text-green-800">📊 {pageInfo}</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>

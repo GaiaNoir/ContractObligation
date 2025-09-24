@@ -13,6 +13,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export const metadata: Metadata = {
   title: "ContractObligation - Extract Contract Obligations in 2 Minutes for $5",
   description: "AI-powered contract obligation extractor. Upload your PDF contract and get all obligations, deadlines, and responsible parties extracted instantly. Professional results in 2 minutes for just $5.",
@@ -28,11 +34,6 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://contractobligation.com'),
   alternates: {
     canonical: '/',
-  },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
   },
   openGraph: {
     title: "ContractObligation - Extract Contract Obligations in 2 Minutes for $5",

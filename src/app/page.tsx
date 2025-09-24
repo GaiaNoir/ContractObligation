@@ -18,5 +18,5 @@ export default function Home() {
     return <LandingPage onGetStarted={() => setShowProcessor(true)} />;
   }
 
-  return <ContractProcessor onBackToHome={() => setShowProcessor(false)} />;
+  return <ContractProcessor onBackToHomeAction={() => setShowProcessor(false)} />;
 }
