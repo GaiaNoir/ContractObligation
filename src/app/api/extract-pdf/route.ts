@@ -184,15 +184,33 @@ async function extractObligations(text: string, pageBreaks?: number[]): Promise<
       messages: [
         {
           role: "system",
-          content: "You are a legal document analyzer. Extract obligations from contracts and return them as a JSON array with source traceability."
+          content: "You are a legal document analyzer specializing in contract obligation extraction. Your primary task is to identify all contractual obligations while properly consolidating party references. Always normalize party names to avoid duplicates (e.g., 'Agency' and 'Marketing Agency' should be treated as the same entity). Extract obligations accurately and return them as a JSON array with source traceability."
         },
         {
           role: "user",
           content: `Extract all obligations from this contract. For each obligation, identify:
 1. What needs to be done (obligation)
-2. Who is responsible (responsible_party: Party A or Party B)
+2. Who is responsible (responsible_party)
 3. Any deadlines (deadline: use "Not specified" if none)
 4. The exact sentence or paragraph from the original text where this obligation appears (source_text)
+
+IMPORTANT INSTRUCTIONS FOR PARTY IDENTIFICATION:
+- First, carefully read the entire contract to identify the main parties involved
+- Look for party definitions at the beginning of the contract (e.g., "Company", "Client", "Agency", "Service Provider")
+- Intelligently consolidate party references by analyzing context:
+  * If "Marketing agency" and "Agency" clearly refer to the same entity (same company name, same role), consolidate them
+  * If "Company" and "Service Provider" refer to the same entity based on context, consolidate them
+  * If "Client" and "Customer" refer to the same entity, consolidate them
+  * BUT if the contract mentions multiple companies or service providers as separate entities, keep them separate
+- Use contextual clues to determine if terms refer to the same party:
+  * Same company name or legal entity name
+  * Same address or contact information
+  * Same role and responsibilities described
+  * Consistent pronoun usage referring to the same entity
+- When consolidating, use the most specific and descriptive party name found
+- If you're unsure whether two terms refer to the same party, keep them separate to avoid incorrect consolidation
+- If multiple parties could be responsible for the same obligation, use "Both parties" or "Either party"
+- Only use generic terms like "Party A" or "Party B" if no specific party names are mentioned in the contract
 
 Return as a JSON array with fields: obligation, responsible_party, deadline, source_text.
 
