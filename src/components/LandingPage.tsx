@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 interface LandingPageProps {
-  onGetStarted: () => void;
+  onGetStartedAction: () => void;
 }
 
-export default function LandingPage({ onGetStarted }: LandingPageProps) {
+export default function LandingPage({ onGetStartedAction }: LandingPageProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
   const handleGetStarted = () => {
     trackEvent('get_started_clicked', { source: 'hero_button' });
-    onGetStarted();
+    onGetStartedAction();
   };
 
   const handleDemoClick = () => {
@@ -100,8 +100,16 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 Only $5 per contract
               </div>
               <div className="flex items-center text-xs sm:text-sm font-medium text-gray-700 bg-white px-3 sm:px-4 py-2 rounded-lg border border-gray-200">
+                <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+                Risk analysis
+              </div>
+              <div className="flex items-center text-xs sm:text-sm font-medium text-gray-700 bg-white px-3 sm:px-4 py-2 rounded-lg border border-gray-200">
+                <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
+                Batch processing
+              </div>
+              <div className="flex items-center text-xs sm:text-sm font-medium text-gray-700 bg-white px-3 sm:px-4 py-2 rounded-lg border border-gray-200">
                 <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                Professional export
+                Source traceability
               </div>
             </div>
 
@@ -155,13 +163,23 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 </div>
               </div>
               
+              {/* Risk Alert Banner */}
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center">
+                  <svg className="w-4 h-4 text-red-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span className="text-xs sm:text-sm font-medium text-red-800">HIGH RISK: Auto-renewal without notice</span>
+                </div>
+              </div>
+              
               <div className="space-y-3 sm:space-y-4">
                 <div className="p-3 sm:p-4 rounded-lg bg-blue-50 border-l-4 border-blue-500">
                   <div className="flex items-start space-x-2 sm:space-x-3">
                     <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white">A</div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs sm:text-sm text-gray-800 font-medium">Party A must deliver goods by March 15, 2024</p>
-                      <p className="text-xs text-blue-600 mt-1">Specific deadline</p>
+                      <p className="text-xs text-blue-600 mt-1">Specific deadline • Page 3, Line 45</p>
                     </div>
                   </div>
                 </div>
@@ -171,7 +189,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                     <div className="w-5 h-5 sm:w-6 sm:h-6 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white">B</div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs sm:text-sm text-gray-800 font-medium">Party B shall make payment within 30 days</p>
-                      <p className="text-xs text-green-600 mt-1">Relative timeframe</p>
+                      <p className="text-xs text-green-600 mt-1">Relative timeframe • Page 2, Line 12</p>
                     </div>
                   </div>
                 </div>
@@ -185,7 +203,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs sm:text-sm text-gray-800 font-medium">Both parties must maintain confidentiality</p>
-                      <p className="text-xs text-purple-600 mt-1">Ongoing obligation</p>
+                      <p className="text-xs text-purple-600 mt-1">Ongoing obligation • Page 1, Line 8</p>
                     </div>
                   </div>
                 </div>
@@ -396,73 +414,176 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         </div>
       </div>
 
-      {/* Pricing Section */}
-      <div id="pricing" className="py-12 sm:py-16 lg:py-20 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <div className="mb-12 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Simple, Transparent Pricing</h2>
-            <p className="text-lg sm:text-xl text-gray-600">No subscriptions, no hidden fees. Pay only for what you use.</p>
+{/* Pricing Section */}
+<div id="pricing" className="py-12 sm:py-16 lg:py-20 bg-white">
+  <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+    <div className="mb-12 sm:mb-16">
+      <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Simple, Transparent Pricing</h2>
+      <p className="text-lg sm:text-xl text-gray-600">No subscriptions, no hidden fees. Volume discounts available for batch processing.</p>
+    </div>
+    
+    {/* Pricing Tiers */}
+    <div className="grid md:grid-cols-3 gap-6 mb-8">
+      {/* Single Contract */}
+      <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+        <div className="text-center mb-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Single Contract</h3>
+          <div className="text-3xl font-bold text-blue-600 mb-1">$5</div>
+          <div className="text-gray-600">per contract</div>
+        </div>
+        <div className="space-y-3 text-sm">
+          <div className="flex items-center">
+            <svg className="w-4 h-4 text-green-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-gray-700">Perfect for individual contracts</span>
           </div>
-          
-          <div className="bg-blue-50 rounded-2xl p-6 sm:p-8 lg:p-12 border border-blue-200">
-            <div className="mb-6 sm:mb-8">
-              <div className="text-4xl sm:text-5xl lg:text-6xl font-bold text-blue-600 mb-2">$5</div>
-              <div className="text-lg sm:text-xl text-gray-600">per contract analysis</div>
-            </div>
-            
-            <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8 text-left">
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-sm sm:text-base font-medium text-gray-700">Complete obligation extraction</span>
-                </div>
-                <div className="flex items-center">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-sm sm:text-base font-medium text-gray-700">Deadline identification</span>
-                </div>
-                <div className="flex items-center">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-sm sm:text-base font-medium text-gray-700">Party responsibility mapping</span>
-                </div>
-              </div>
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-sm sm:text-base font-medium text-gray-700">Professional PDF export</span>
-                </div>
-                <div className="flex items-center">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-sm sm:text-base font-medium text-gray-700">Text format download</span>
-                </div>
-                <div className="flex items-center">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-sm sm:text-base font-medium text-gray-700">2-minute processing</span>
-                </div>
-              </div>
-            </div>
-            
-            <button
-              onClick={handleGetStarted}
-              className="btn-primary text-lg sm:text-xl px-8 sm:px-12 py-3 sm:py-4 w-full sm:w-auto"
-            >
-              Get Started Now
-            </button>
+          <div className="flex items-center">
+            <svg className="w-4 h-4 text-green-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-gray-700">All premium features included</span>
           </div>
         </div>
       </div>
 
+      {/* Volume Discount */}
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-200 shadow-md relative">
+        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+          <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium">POPULAR</span>
+        </div>
+        <div className="text-center mb-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Volume Discount</h3>
+          <div className="text-3xl font-bold text-blue-600 mb-1">$4</div>
+          <div className="text-gray-600">per contract</div>
+          <div className="text-sm text-blue-600 font-medium mt-1">5-9 contracts</div>
+        </div>
+        <div className="space-y-3 text-sm">
+          <div className="flex items-center">
+            <svg className="w-4 h-4 text-green-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-gray-700">20% savings per contract</span>
+          </div>
+          <div className="flex items-center">
+            <svg className="w-4 h-4 text-green-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-gray-700">Batch processing included</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bulk Discount */}
+      <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+        <div className="text-center mb-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Bulk Discount</h3>
+          <div className="text-3xl font-bold text-blue-600 mb-1">$3</div>
+          <div className="text-gray-600">per contract</div>
+          <div className="text-sm text-blue-600 font-medium mt-1">10+ contracts</div>
+        </div>
+        <div className="space-y-3 text-sm">
+          <div className="flex items-center">
+            <svg className="w-4 h-4 text-green-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-gray-700">40% savings per contract</span>
+          </div>
+          <div className="flex items-center">
+            <svg className="w-4 h-4 text-green-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-gray-700">Maximum value for enterprises</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Features Section */}
+    <div className="bg-blue-50 rounded-2xl p-6 sm:p-8 lg:p-12 border border-blue-200">
+      <div className="mb-6 sm:mb-8 text-center">
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">All Plans Include</h3>
+        <p className="text-gray-600">Every contract analysis comes with our complete feature set</p>
+      </div>
+      
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8 text-left">
+        <div className="space-y-2 sm:space-y-3">
+          <div className="flex items-center">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm sm:text-base font-medium text-gray-700">Complete obligation extraction</span>
+          </div>
+          <div className="flex items-center">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm sm:text-base font-medium text-gray-700">AI-powered risk analysis</span>
+          </div>
+          <div className="flex items-center">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm sm:text-base font-medium text-gray-700">Source text traceability</span>
+          </div>
+          <div className="flex items-center">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm sm:text-base font-medium text-gray-700">Batch contract processing</span>
+          </div>
+        </div>
+        <div className="space-y-2 sm:space-y-3">
+          <div className="flex items-center">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm sm:text-base font-medium text-gray-700">Multi-format support (PDF, DOCX, TXT)</span>
+          </div>
+          <div className="flex items-center">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm sm:text-base font-medium text-gray-700">Deadline identification</span>
+          </div>
+          <div className="flex items-center">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm sm:text-base font-medium text-gray-700">Party responsibility mapping</span>
+          </div>
+          <div className="flex items-center">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm sm:text-base font-medium text-gray-700">Professional PDF export</span>
+          </div>
+        </div>
+        <div className="space-y-2 sm:space-y-3">
+          <div className="flex items-center">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm sm:text-base font-medium text-gray-700">Text format download</span>
+          </div>
+          <div className="flex items-center">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm sm:text-base font-medium text-gray-700">2-minute processing</span>
+          </div>
+        </div>
+      </div>
+      
+      <button
+        onClick={handleGetStarted}
+        className="btn-primary text-lg sm:text-xl px-8 sm:px-12 py-3 sm:py-4 w-full sm:w-auto"
+      >
+        Get Started Now
+      </button>
+    </div>
+  </div>
+</div>
       {/* Contact Section */}
       <div id="contact" className="py-12 sm:py-16 lg:py-20 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">

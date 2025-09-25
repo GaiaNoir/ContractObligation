@@ -6,6 +6,7 @@ import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
 import ObligationCard from './ObligationCard';
 import ResultsSummary from './ResultsSummary';
+import { getPricingBreakdown, convertToZAR } from '@/lib/pricing';
 
 interface FileProcessingStatus {
   file: File;
@@ -437,6 +438,10 @@ export default function ContractProcessor({ onBackToHomeAction }: ContractProces
       const reference = storeData.reference;
       setPaymentReference(reference);
 
+      // Calculate dynamic pricing based on contract count
+      const contractCount = isBatchMode && batchResults ? batchResults.totalFiles : 1;
+      const pricing = getPricingBreakdown(contractCount);
+
       const paymentResponse = await fetch('/api/paystack/initialize', {
         method: 'POST',
         headers: {
@@ -444,11 +449,16 @@ export default function ContractProcessor({ onBackToHomeAction }: ContractProces
         },
         body: JSON.stringify({
           email,
-          amount: 90, // R90 ZAR (equivalent to $5 USD)
+          amount: pricing.totalPriceZAR,
           metadata: {
             reference,
-            filename,
-            obligations_count: obligations.length
+            filename: isBatchMode ? `Batch (${contractCount} files)` : filename,
+            obligations_count: obligations.length,
+            contract_count: contractCount,
+            price_per_contract_usd: pricing.pricePerContract,
+            total_price_usd: pricing.totalPrice,
+            tier_description: pricing.tierDescription,
+            savings_usd: pricing.savings
           }
         }),
       });
@@ -473,8 +483,13 @@ export default function ContractProcessor({ onBackToHomeAction }: ContractProces
       }
 
       trackEvent('payment_popup_opened', {
-        amount: 90,
-        obligations_count: obligations.length
+        amount: pricing.totalPriceZAR,
+        amount_usd: pricing.totalPrice,
+        contract_count: contractCount,
+        price_per_contract: pricing.pricePerContract,
+        obligations_count: obligations.length,
+        tier: pricing.tierDescription,
+        savings: pricing.savings
       });
 
     } catch (err) {
@@ -865,7 +880,11 @@ export default function ContractProcessor({ onBackToHomeAction }: ContractProces
                     Preview Mode - Showing first {Math.min(3, obligations.length)} of {obligations.length} obligations
                   </h3>
                   <p className="text-yellow-700">
-                    Pay $5 to unlock all {obligations.length} obligations and download options
+                    {(() => {
+                      const contractCount = isBatchMode && batchResults ? batchResults.totalFiles : 1;
+                      const pricing = getPricingBreakdown(contractCount);
+                      return `Pay $${pricing.totalPrice} to unlock all ${obligations.length} obligations and download options`;
+                    })()}
                   </p>
                   <div className="mt-3 flex items-center space-x-4 text-sm">
                     <div className="flex items-center space-x-1">
@@ -920,8 +939,28 @@ export default function ContractProcessor({ onBackToHomeAction }: ContractProces
                         </svg>
                       </div>
                       <div className="text-left">
-                        <h3 className="text-2xl font-bold text-green-800">Only $5</h3>
-                        <p className="text-green-700">One-time payment</p>
+                        {(() => {
+                          const contractCount = isBatchMode && batchResults ? batchResults.totalFiles : 1;
+                          const pricing = getPricingBreakdown(contractCount);
+                          return (
+                            <>
+                              <h3 className="text-2xl font-bold text-green-800">
+                                ${pricing.totalPrice}
+                                {pricing.hasSavings && (
+                                  <span className="text-lg text-green-600 ml-2">(Save ${pricing.savings}!)</span>
+                                )}
+                              </h3>
+                              <p className="text-green-700">
+                                {contractCount === 1 ? 'One-time payment' : `${contractCount} contracts • $${pricing.pricePerContract} each`}
+                              </p>
+                              {pricing.hasSavings && (
+                                <p className="text-sm text-green-600 font-medium">
+                                  {pricing.tierDescription} - Volume discount applied!
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-sm">
@@ -960,7 +999,11 @@ export default function ContractProcessor({ onBackToHomeAction }: ContractProces
                       <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                       </svg>
-                      Pay $5 to {obligations.length > 3 ? 'See Full Results' : 'Download Results'}
+                      {(() => {
+                        const contractCount = isBatchMode && batchResults ? batchResults.totalFiles : 1;
+                        const pricing = getPricingBreakdown(contractCount);
+                        return `Pay $${pricing.totalPrice} to ${obligations.length > 3 ? 'See Full Results' : 'Download Results'}`;
+                      })()}
                       <svg className="w-6 h-6 ml-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                       </svg>
@@ -992,7 +1035,11 @@ export default function ContractProcessor({ onBackToHomeAction }: ContractProces
                         onClick={() => handlePayment(userEmail)}
                         className="flex-1 btn-primary py-3"
                       >
-                        Pay $5
+                        {(() => {
+                          const contractCount = isBatchMode && batchResults ? batchResults.totalFiles : 1;
+                          const pricing = getPricingBreakdown(contractCount);
+                          return `Pay $${pricing.totalPrice}`;
+                        })()}
                       </button>
                       <button
                         onClick={() => setShowEmailInput(false)}

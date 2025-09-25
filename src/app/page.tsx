@@ -15,7 +15,7 @@ export default function Home() {
   const [showProcessor, setShowProcessor] = useState(false);
 
   if (!showProcessor) {
-    return <LandingPage onGetStarted={() => setShowProcessor(true)} />;
+    return <LandingPage onGetStartedAction={() => setShowProcessor(true)} />;
   }
 
   return <ContractProcessor onBackToHomeAction={() => setShowProcessor(false)} />;
