@@ -150,7 +150,7 @@ export default function ObligationCard({ obligation, isPreview = false }: Obliga
             <div className="flex-1">
               <span className="font-semibold text-sm">{obligation.risk.level} Risk</span>
               <span className="mx-2 text-gray-400">•</span>
-              <span className="text-sm text-gray-600">{obligation.risk.explanation}</span>
+              <span className="text-sm text-gray-600 break-words">{obligation.risk.explanation}</span>
             </div>
           </div>
         </div>
@@ -222,13 +222,51 @@ export default function ObligationCard({ obligation, isPreview = false }: Obliga
           </div>
         </div>
         
+        {/* Element Type Badge */}
+        {obligation.element_type && (
+          <div className="mb-4">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200">
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a.997.997 0 01-1.414 0L7 17H2a2 2 0 01-2-2v-3a2 2 0 012-2h5z" />
+              </svg>
+              {obligation.element_type}
+            </span>
+          </div>
+        )}
+
         {/* Obligation Text */}
         <div className="bg-gray-50 rounded p-4 border border-gray-200 mb-4">
           <div className="text-xs font-medium text-gray-500 mb-2">OBLIGATION</div>
-          <p className="text-base text-gray-800 leading-relaxed">
+          <p className="text-base text-gray-800 leading-relaxed whitespace-pre-wrap break-words">
             {obligation.obligation}
           </p>
         </div>
+
+        {/* Affected Party */}
+        {obligation.affected_party && obligation.affected_party !== 'N/A' && (
+          <div className="bg-blue-50 rounded p-4 border border-blue-200 mb-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <span className="text-xs font-medium text-blue-700">AFFECTED PARTY</span>
+            </div>
+            <p className="text-sm text-blue-800 font-medium">{obligation.affected_party}</p>
+          </div>
+        )}
+
+        {/* Conditions */}
+        {obligation.conditions && obligation.conditions !== 'None' && (
+          <div className="bg-yellow-50 rounded p-4 border border-yellow-200 mb-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-xs font-medium text-yellow-700">CONDITIONS</span>
+            </div>
+            <p className="text-sm text-yellow-800">{obligation.conditions}</p>
+          </div>
+        )}
         {/* Confidence indicator */}
         {obligation.confidence && (
           <div className="bg-blue-50 rounded p-4 border border-blue-200 mb-4">
@@ -308,7 +346,7 @@ export default function ObligationCard({ obligation, isPreview = false }: Obliga
                   <div>
                     <h4 className="text-xs font-medium text-gray-500 mb-2">ORIGINAL TEXT</h4>
                     <div className="bg-gray-50 rounded p-3 border border-gray-200">
-                      <p className="text-sm text-gray-800 leading-relaxed italic">
+                      <p className="text-sm text-gray-800 leading-relaxed italic whitespace-pre-wrap break-words">
                         "{obligation.source.text}"
                       </p>
                     </div>

@@ -17,6 +17,9 @@ export async function GET(request: NextRequest) {
 
     let paymentData = paymentStorage.get(reference);
     console.log('Direct lookup result:', paymentData ? 'found' : 'not found');
+    
+    // Log all available references for debugging
+    console.log('Available references in storage:', paymentStorage.getAllReferences());
 
     // If not found with the provided reference, it might be a Paystack reference
     // Try to find the data by verifying the payment with Paystack to get the metadata

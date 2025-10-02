@@ -26,6 +26,11 @@ export default function ResultsSummary({ obligations, summary }: ResultsSummaryP
   const requiresReviewCount = summary?.requiresReviewCount ?? 
     obligations.filter(o => (o.confidence || 0) < 0.6).length;
 
+  // Calculate additional statistics for new fields
+  const withConditions = obligations.filter(
+    o => o.conditions && o.conditions !== 'None'
+  ).length;
+
   const getSummaryStats = () => {
     return [
       {
@@ -49,6 +54,16 @@ export default function ResultsSummary({ obligations, summary }: ResultsSummaryP
         color: 'text-orange-600 bg-orange-100'
       },
       {
+        label: 'With Conditions',
+        value: withConditions,
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        color: 'text-purple-600 bg-purple-100'
+      },
+      {
         label: 'Needs Review',
         value: requiresReviewCount,
         icon: (
@@ -57,16 +72,6 @@ export default function ResultsSummary({ obligations, summary }: ResultsSummaryP
           </svg>
         ),
         color: 'text-yellow-600 bg-yellow-100'
-      },
-      {
-        label: 'Avg Confidence',
-        value: `${Math.round(averageConfidence * 100)}%`,
-        icon: (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        ),
-        color: 'text-green-600 bg-green-100'
       }
     ];
   };
@@ -108,6 +113,38 @@ export default function ResultsSummary({ obligations, summary }: ResultsSummaryP
           </div>
         </div>
       )}
+
+      {/* Element type breakdown */}
+      {(() => {
+        const elementTypes = obligations.reduce((acc, obligation) => {
+          if (obligation.element_type) {
+            acc[obligation.element_type] = (acc[obligation.element_type] || 0) + 1;
+          }
+          return acc;
+        }, {} as Record<string, number>);
+
+        return Object.keys(elementTypes).length > 0 && (
+          <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200">
+            <h4 className="text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">Element Types</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-2 text-xs sm:text-sm">
+              {Object.entries(elementTypes)
+                .sort(([,a], [,b]) => b - a) // Sort by count descending
+                .slice(0, 6) // Show top 6 types
+                .map(([type, count]) => (
+                <div key={type} className="flex justify-between items-center py-1">
+                  <span className="text-gray-600 truncate pr-2" title={type}>{type}</span>
+                  <span className="font-medium text-gray-900 flex-shrink-0">{count}</span>
+                </div>
+              ))}
+            </div>
+            {Object.keys(elementTypes).length > 6 && (
+              <div className="text-xs text-gray-500 mt-2">
+                +{Object.keys(elementTypes).length - 6} more types
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Deadline type breakdown */}
       {summary?.obligationsByDeadlineType && Object.keys(summary.obligationsByDeadlineType).length > 0 && (

@@ -48,7 +48,7 @@ function ResultsContent() {
           errorMessage += ` (Payment status: ${resultsData.paymentStatus})`;
         }
         if (resultsData.paymentAmount) {
-          errorMessage += ` (Amount: ${resultsData.paymentAmount/100} ZAR)`;
+          errorMessage += ` (Amount: ${resultsData.paymentAmount / 100} ZAR)`;
         }
         throw new Error(errorMessage);
       }
@@ -68,56 +68,175 @@ function ResultsContent() {
     try {
       const pdf = new jsPDF();
       const pageWidth = pdf.internal.pageSize.getWidth();
-      const margin = 20;
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 25;
       const maxWidth = pageWidth - 2 * margin;
       let yPosition = 30;
 
+      // Set font to normal throughout - no bold anywhere
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(12);
+
+      // Helper function to add a new page
+      const addNewPage = () => {
+        pdf.addPage();
+        yPosition = 30;
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        pdf.text('Contract Obligations Report', margin, 20);
+        pdf.text(`Page ${pdf.getNumberOfPages()}`, pageWidth - margin - 30, 20);
+        pdf.setFontSize(12);
+        yPosition += 10;
+      };
+
+      // Helper function to check if we need a new page
+      const checkPageBreak = (requiredSpace: number) => {
+        if (yPosition + requiredSpace > pageHeight - 30) {
+          addNewPage();
+        }
+      };
+
       // Title
-      pdf.setFontSize(20);
+      pdf.setFontSize(16);
       pdf.text('Contract Obligations Report', margin, yPosition);
       yPosition += 20;
 
-      // File info
+      // Document info
       pdf.setFontSize(12);
       pdf.text(`File: ${paymentData.filename}`, margin, yPosition);
-      yPosition += 10;
+      yPosition += 8;
       pdf.text(`Pages: ${paymentData.pageInfo}`, margin, yPosition);
-      yPosition += 10;
-      pdf.text(`Generated: ${new Date().toLocaleDateString()}`, margin, yPosition);
+      yPosition += 8;
+      pdf.text(`Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, margin, yPosition);
+      yPosition += 8;
+      pdf.text(`Total Obligations: ${paymentData.obligations.length}`, margin, yPosition);
       yPosition += 20;
 
-      // Obligations
-      pdf.setFontSize(16);
-      pdf.text('Extracted Obligations:', margin, yPosition);
+      // Summary section
+      const riskCounts = paymentData.obligations.reduce((acc, o) => {
+        if (o.risk) {
+          acc[o.risk.level] = (acc[o.risk.level] || 0) + 1;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      if (Object.keys(riskCounts).length > 0) {
+        pdf.text('Risk Distribution:', margin, yPosition);
+        yPosition += 10;
+        Object.entries(riskCounts).forEach(([level, count]) => {
+          pdf.text(`  ${level} Risk: ${count} obligation${count !== 1 ? 's' : ''}`, margin, yPosition);
+          yPosition += 8;
+        });
+        yPosition += 10;
+      }
+
+      // Obligations header
+      pdf.text('Detailed Obligations:', margin, yPosition);
       yPosition += 15;
 
+      // Process each obligation
       paymentData.obligations.forEach((obligation, index) => {
-        // Check if we need a new page
-        if (yPosition > 250) {
-          pdf.addPage();
-          yPosition = 30;
-        }
+        checkPageBreak(60); // Check if we need space for the obligation
 
-        pdf.setFontSize(12);
-        pdf.setFont('helvetica', 'bold');
-        
-        // Add contract source if available
+        // Obligation number - start details on the same line
+        pdf.text(`${index + 1}.`, margin, yPosition);
+
+        let currentX = margin + 15; // Start details next to the number
+        let currentY = yPosition;
+
+        // Contract source (for batch processing)
         if (obligation.contractSource) {
-          pdf.text(`${index + 1}. Contract: ${obligation.contractSource.filename}`, margin, yPosition);
-          yPosition += 8;
+          pdf.text(`Contract: ${obligation.contractSource.filename}`, currentX, currentY);
+          currentY += 10;
         }
-        
-        pdf.text(`${obligation.contractSource ? '   ' : `${index + 1}. `}Responsible Party: ${obligation.responsible_party}`, margin, yPosition);
-        yPosition += 8;
-        
-        pdf.text(`${obligation.contractSource ? '   ' : ''}Deadline: ${obligation.deadline}`, margin, yPosition);
-        yPosition += 8;
 
-        pdf.setFont('helvetica', 'normal');
-        const lines = pdf.splitTextToSize(obligation.obligation, maxWidth);
-        pdf.text(lines, margin, yPosition);
-        yPosition += lines.length * 6 + 10;
+        // Element type
+        if (obligation.element_type) {
+          pdf.text(`Element Type: ${obligation.element_type}`, currentX, currentY);
+          currentY += 10;
+        }
+
+        // Responsible party
+        pdf.text(`Responsible Party: ${obligation.responsible_party}`, currentX, currentY);
+        currentY += 10;
+
+        // Affected party
+        if (obligation.affected_party && obligation.affected_party !== 'N/A') {
+          pdf.text(`Affected Party: ${obligation.affected_party}`, currentX, currentY);
+          currentY += 10;
+        }
+
+        // Deadline
+        pdf.text(`Deadline: ${obligation.deadline}`, currentX, currentY);
+        currentY += 10;
+
+        // Conditions
+        if (obligation.conditions && obligation.conditions !== 'None') {
+          pdf.text('Conditions:', currentX, currentY);
+          currentY += 8;
+          const conditionsLines = pdf.splitTextToSize(obligation.conditions, maxWidth - 40);
+          conditionsLines.forEach((line: string) => {
+            checkPageBreak(8);
+            pdf.text(line, currentX + 10, currentY);
+            currentY += 8;
+          });
+          currentY += 5;
+        }
+
+        // Risk information
+        if (obligation.risk) {
+          pdf.text(`Risk Level: ${obligation.risk.level}`, currentX, currentY);
+          currentY += 8;
+          pdf.text('Risk Explanation:', currentX, currentY);
+          currentY += 8;
+          const riskLines = pdf.splitTextToSize(obligation.risk.explanation, maxWidth - 40);
+          riskLines.forEach((line: string) => {
+            checkPageBreak(8);
+            pdf.text(line, currentX + 10, currentY);
+            currentY += 8;
+          });
+          currentY += 5;
+        }
+
+        // Obligation description
+        pdf.text('Obligation:', currentX, currentY);
+        currentY += 8;
+        const obligationLines = pdf.splitTextToSize(obligation.obligation, maxWidth - 40);
+        obligationLines.forEach((line: string) => {
+          checkPageBreak(8);
+          pdf.text(line, currentX + 10, currentY);
+          currentY += 8;
+        });
+        currentY += 5;
+
+        // Source information - put Source and Page on same line when possible
+        if (obligation.source) {
+          let sourceLine = 'Source:';
+          if (obligation.source.pageNumber) {
+            sourceLine += ` Page ${obligation.source.pageNumber}`;
+          }
+
+          pdf.text(sourceLine, currentX, currentY);
+          currentY += 8;
+
+          pdf.text('Quote:', currentX, currentY);
+          currentY += 8;
+          const sourceLines = pdf.splitTextToSize(`"${obligation.source.text}"`, maxWidth - 40);
+          sourceLines.forEach((line: string) => {
+            checkPageBreak(8);
+            pdf.text(line, currentX + 10, currentY);
+            currentY += 8;
+          });
+          currentY += 5;
+        }
+
+        yPosition = currentY + 15; // Space between obligations
       });
+
+      // Footer
+      pdf.setFontSize(10);
+      pdf.text('Generated by ContractObligation AI', margin, pageHeight - 15);
+      pdf.text(`Total Pages: ${pdf.getNumberOfPages()}`, pageWidth - margin - 40, pageHeight - 15);
 
       pdf.save(`contract-obligations-${paymentData.filename}.pdf`);
     } catch (err) {
@@ -140,13 +259,87 @@ function ResultsContent() {
     paymentData.obligations.forEach((obligation, index) => {
       if (obligation.contractSource) {
         content += `${index + 1}. Contract: ${obligation.contractSource.filename}\n`;
+
+        // Add element type if available
+        if (obligation.element_type) {
+          content += `   Element Type: ${obligation.element_type}\n`;
+        }
+
         content += `   Responsible Party: ${obligation.responsible_party}\n`;
+
+        // Add affected party if available
+        if (obligation.affected_party && obligation.affected_party !== 'N/A') {
+          content += `   Affected Party: ${obligation.affected_party}\n`;
+        }
+
         content += `   Deadline: ${obligation.deadline}\n`;
-        content += `   Obligation: ${obligation.obligation}\n\n`;
+
+        // Add conditions if available
+        if (obligation.conditions && obligation.conditions !== 'None') {
+          content += `   Conditions: ${obligation.conditions}\n`;
+        }
+
+        content += `   Obligation: ${obligation.obligation}\n`;
+
+        // Add risk information if available
+        if (obligation.risk) {
+          content += `   Risk Level: ${obligation.risk.level}\n`;
+          content += `   Risk Explanation: ${obligation.risk.explanation}\n`;
+        }
+
+        // Add source information if available
+        if (obligation.source) {
+          content += `   Source Text: "${obligation.source.text}"\n`;
+          if (obligation.source.pageNumber) {
+            content += `   Page: ${obligation.source.pageNumber}\n`;
+          }
+          if (obligation.source.lineNumber) {
+            content += `   Line: ${obligation.source.lineNumber}\n`;
+          }
+        }
+        content += `\n`;
       } else {
-        content += `${index + 1}. Responsible Party: ${obligation.responsible_party}\n`;
+        content += `${index + 1}. `;
+
+        // Add element type if available
+        if (obligation.element_type) {
+          content += `Element Type: ${obligation.element_type}\n`;
+          content += `   `;
+        }
+
+        content += `Responsible Party: ${obligation.responsible_party}\n`;
+
+        // Add affected party if available
+        if (obligation.affected_party && obligation.affected_party !== 'N/A') {
+          content += `   Affected Party: ${obligation.affected_party}\n`;
+        }
+
         content += `   Deadline: ${obligation.deadline}\n`;
-        content += `   Obligation: ${obligation.obligation}\n\n`;
+
+        // Add conditions if available
+        if (obligation.conditions && obligation.conditions !== 'None') {
+          content += `   Conditions: ${obligation.conditions}\n`;
+        }
+
+        content += `   Obligation: ${obligation.obligation}\n`;
+
+        // Add risk information if available
+        if (obligation.risk) {
+          content += `   Risk Level: ${obligation.risk.level}\n`;
+          content += `   Risk Explanation: ${obligation.risk.explanation}\n`;
+        }
+
+        // Add source information if available
+        if (obligation.source) {
+          content += `   Source Text: "${obligation.source.text}"\n`;
+          if (obligation.source.pageNumber) {
+            content += `   Page: ${obligation.source.pageNumber}\n`;
+          }
+          if (obligation.source.lineNumber) {
+            content += `   Line: ${obligation.source.lineNumber}\n`;
+          }
+        }
+        content += `\n`;
       }
     });
 
@@ -265,7 +458,7 @@ function ResultsContent() {
               </button>
             </div>
           </div>
-          
+
           <div className="grid gap-4">
             {paymentData.obligations.map((obligation, index) => (
               <ObligationCard key={index} obligation={obligation} isPreview={false} />

@@ -2,6 +2,10 @@ export interface Obligation {
   obligation: string;
   responsible_party: string;
   deadline: string;
+  affected_party?: string;        // Who else is impacted or benefits from this term
+  conditions?: string;            // Any conditions that must be met for this element to apply
+  financial_impact?: string;      // Any monetary amount, percentage, penalty, fee, or financial consequence
+  element_type?: string;          // Type of legal element (e.g., "Obligation", "Payment Term", "Deadline/Timeframe", etc.)
   confidence?: number;
   contractSource?: {
     filename: string;       // Name of the contract file this obligation came from

@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate a unique reference
-    const reference = `ref_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const reference = `ref_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
     // Store the results temporarily
     paymentStorage.store(reference, {
